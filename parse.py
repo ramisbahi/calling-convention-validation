@@ -3,21 +3,26 @@ import json
 import sys
 
 # 0th operand is a modified dest register
-dest_instructions = set(['add', 'addi', 'addiu', 'addu', 'clo', 'clz', 'la', 'li', 'lui', 'move', 'negu', 'seb', 'seh', 'sub', 'subu', 'rotr', 'rotrv', 'sll', 'sllv', 'sra', 'srav', 'srl', 'srlv', 'and', 'andi', 'ext', 'ins', 'nor', 'not', 'or', 'ori', 'wsbh', 'xor', 'xori', 'movn', 'movz', 'slt', 'slti', 'sltiu', 'sltu', 'sgt', 'seq', 'sge', 'sle', 'sgeu', 'sgtu', 'sleu', 'sne', 'mul', 'mfhi', 'mflo', 'jalr', 'lb', 'lbu', 'lh', 'lhu', 'lw', 'lwl', 'lwr', 'ulw', 'll', 'sc'])
+dest_instructions = set(['add', 'addi', 'addiu', 'addu', 'clo', 'clz', 'la', 'li', 'lui', 'move', 'negu', 'seb', 'seh', 'sub', 'subu', 'rotr', 'rotrv', 'sll', 'sllv', 'sra', 'srav', 'srl', 'srlv', 'and', 'andi', 'ext', 'ins', 'nor', 'not', 'or', 'ori', 'wsbh', 'xor', 'xori', 'movn', 'movz', 'slt', 'slti', 'sltiu', 'sltu', 'sgt', 'seq', 'sge', 'sle', 'sgeu', 'sgtu', 'sleu', 'sne', 'mul', 'mfhi', 'mflo', 'jalr', 'lb', 'lbu', 'lh', 'lhu', 'lw', 'lwl', 'lwr', 'ulw', 'll', 'sc', 'l.s'])
 
 # 0th operand is a source register
 source_instructions = set(['div', 'divu', 'madd', 'maddu', 'msub', 'msubu', 'mult', 'multu', 'mthi', 'mtlo', 'beq', 'beqz', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'jr'])
 
-# storing something
-store_instructions = set(['sb', 'sh', 'swl', 'sw', 'swr', 'usw'])
+# storing something 
+store_instructions = set(['sb', 'sh', 'swl', 'sw', 'swr', 'usw', 's.s', 'swc1'])
+load_instructions = set(['lb', 'lh', 'lw'])
 
 # jump or branch
 branch_instructions = set(['beq', 'beqz', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'j', 'b', 'bc1t', 'bc1f'])
 
-other_instructions = set(['jal', 'syscall', 'sw', 'lwc1', 'swc1', 'mfc1', 'mtc1', 'mov.s', 'li.s', 'c.eq.s', 'c.le.s', 'c.lt.s', 'c.gt.s', 'c.ge.s', 'mul.s', 'mul.s', 'div.s', 'add.s', 'sub.s', 's.s', 'l.s', 's.d', 'l.d'])
+other_instructions = set(['jal', 'syscall', 'sw', 'lwc1', 'swc1', 'mfc1', 'mtc1', 'mov.s', 'mov.d', 'li.s', 'li.d', 'c.eq.s', 'c.eq.d', 'c.le.s', 'c.le.d', 'c.lt.s', 'c.lt.d', 'c.gt.s', 'c.gt.d', 'c.ge.s', 'c.ge.d', 'mul.s',  'div.s', 'add.s', 'sub.s', 'sub.d', 's.s', 'l.s', 'l.d', 's.d', 'l.d', 'cvt.s.d', 'cvt.s.w', 'cvt.d.s', 'cvt.d.w', 'cvt.w.d', 'cvt.w.s', 'div.d', 'add.d', 'mul.d', 'abs.d', 'abs.s'])
+
+all_instructions = dest_instructions.union(source_instructions).union(store_instructions).union(branch_instructions).union(other_instructions)
 
 t_regs = set(['$t0', '$t1', '$t2', '$t3', '$t4', '$t5', '$t6', '$t7', '$t8', '$t9'])
-s_regs = set(['$s0', '$s1', '$s2', '$s3', '$s4', '$s5', '$s6', '$s7', '$s8', '$s9'])
+callee_regs = set(['$s0', '$s1', '$s2', '$s3', '$s4', '$s5', '$s6', '$s7', '$s8', '$s9', '$ra'])
+
+directives = set(['.data', '.word', '.globl', '.half', '.byte', '.align', '.word', '.float', '.space', '.ascii', '.asciiz', '.text'])
 
 instruction_map = {} # maps index to line number
 
@@ -34,15 +39,12 @@ def is_instruction(tokens):
     for token in tokens:
         if '#' in token: 
             break
-        if token in dest_instructions.union(source_instructions).union(store_instructions).union(branch_instructions).union(other_instructions):
+        if token in all_instructions:
             return True
     return False
 
 # writes adjusted file, also stores index to line
 def write_to_adjusted(content):
-    with open('adjusted.s', 'r') as adjusted: # allows us to overwrite
-        adjusted.read()
-
     index = 0
     with open('adjusted.s', 'w') as adjusted:
         for line_number, line in enumerate(content):
@@ -51,7 +53,7 @@ def write_to_adjusted(content):
             tokens = line.split()
             last_op_index = calc_last_op_index(tokens)
             for i, token in enumerate(tokens):
-                if '$' in token and ',' not in token and i < last_op_index:
+                if token not in all_instructions and token not in directives and ':' not in token and ',' not in token and i < last_op_index: # add comma here
                     adjusted.write(token + ', ')
                 else:
                     adjusted.write(token + ' ')
@@ -64,15 +66,15 @@ def write_to_adjusted(content):
                 index += 1
             adjusted.write('\n')
 
-source_file = 'test.s'
+source_file = 'analyze.s'
 if len(sys.argv) > 1:
     source_file = sys.argv[1]
 
 with open(source_file, 'r') as source:
     content = source.readlines()
     source.close()
-write_to_adjusted(content) # adds commas, gets rid of .align for parser tool
 
+write_to_adjusted(content) # adds commas, gets rid of .align for parser tool
 stream = os.popen('bin/mips-parser -f adjusted.s')
 output = stream.read()
 parsed = json.loads(output)
@@ -104,10 +106,10 @@ def string_instruction(instruction):
             else:
                 value = operand['value']
             ret += str(value) + ', '
-    return ret[:-2] + '\n'
+    return ret[:-2] 
 
 # checks if any registers in instruction are assumed (i.e. not used as destination earlier in function)
-def check_sources(sources, past_destinations, label, instruction, index, done_jal):
+def check_sources(sources, destinations, label, instruction, index, done_jal, branch_path, usable_t_regs):
     for source in sources:
         value = ""
         if source['type'] == 'Register': # is a register
@@ -116,74 +118,113 @@ def check_sources(sources, past_destinations, label, instruction, index, done_ja
             value = source['base']['value']
         else:
             break # not a register or address operand, not going to find one after this
-        if value not in past_destinations and do_not_assume_reg(value, index, done_jal):
-            violation_message = ""
-            if value in t_regs:
-                violation_message = "Potential violation: value of " + value + " is assumed in " + label +". This may be due to not saving before/after a jal in this context, or simply not having used this register as a destination in this context.\t"
-            else:
-                violation_message = "Potential violation: value of " + value + " is assumed in " + label +".\t"
+        violation_message = ""
+        violation = False
+        if value not in destinations:
+            if do_not_assume_reg(value, done_jal):
+                violation = True
+                violation_message = "Potential violation: value of " + value + " is assumed in " + label +". This register has not been used as a destination in this context. It should be passed as an argument.\n"
+        elif value in t_regs and value not in usable_t_regs: # t register in destinations, but not usable_t_regs
+            violation = True
+            violation_message = "Potential violation: value of " + value + " is assumed in " + label +". This should have been saved/restored before/after a recent jal in this context.\n"
+        
+        if violation:
             violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n" 
-            potential_violations[index] = violation_message
+            path = label + "->" + branch_path
+            violation_message += "Path taken: " + path[:-2] + "\n"
+            potential_violations[index] = violation_message 
+
+# register - a register which has been changed (used as a destination), as determined in traversal
+# stored - what we have stored in this context
+# label - current function  (for print)
+# instruction - current instruction (for print)
+# index - current index (for line number to print)
+# branch_path - current branch path (for print)
+# if unstored callee-saved, this is a potential violation (since we know it has been changed)
+def check_stored(register, stored, label, instruction, index, branch_path):
+    if register in callee_regs and register not in stored: # s/$ra register which hasn't been stored (being changed = uh oh)
+        violation_message = "Potential violation: " + register + " changed in " + label + " and not saved.\n"
+        violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n"
+        path = label + "->" + branch_path
+        violation_message += "Path taken: " + path[:-2] + "\n"
+        potential_violations[index] = violation_message
 
 # can't assume vals in these
 # if v register - check if recent jal (after jr)
-def do_not_assume_reg(register, index, done_jal):
+def do_not_assume_reg(register, done_jal):
     if 'v' in register and done_jal: # jal'd earlier in this function, so v can be "assumed" as return value from this
         return False
-    return register != '$sp' and register != '$0' and 'a' not in register
+    return register not in set(['$sp', '$0', '$zero']) and 'a' not in register and 'f' not in register
 
+def is_sp(operand):
+    return operand['type'] == 'Address' and operand['base']['value'] == '$sp'
+
+def is_load_from_stack(instruction):
+    return instruction['opcode'] in load_instructions and is_sp(instruction['operands'][1])
+
+# later - to differentiate between t reg which needed to be saved before jal and t register not in current context, have destinations and usable_t_regs - usable resets when jal, destinations doesn't - if not in destinations at all - bad, elif not in usable_t_regs - save from last jal
+
+####### main traversal - checks for potential calling convention violations
 # start = starting index
 # label = current function label
 # stored = things that have been saved
 # past destinations = registers used as destination (important bc cannot use as source unless previously used as destination)
-# t_reg_used = t registers that have been used so far 
 # done_jal = boolean value, whether or not jal has been done in this function yet
-def check_function(start, label, stored, past_destinations, done_jal):
+# branch_path = path from function and branches/jumps
+# past_usable_t_regs = t registers which have not been disrupted by jal
+def check_function(start, label, past_stored, past_destinations, done_jal, branch_path, past_usable_t_regs):
+    destinations = past_destinations.copy()
+    stored = past_stored.copy()
+    usable_t_regs = past_usable_t_regs.copy()
+
     index = start
-    while instructions[index]['opcode'] != 'jr': # go through each instruction in callee function
+    while instructions[index]['opcode'] not in ['jr', 'j', 'b']: # go through each instruction in callee function
         instruction = instructions[index]
         if instruction['opcode'] == 'jal':
             jal_label = instruction['operands'][0]['value']
-            check_function(labels[jal_label]['address'], jal_label, set(), set(), False) # jal new function, so reset all parameters
-            for register in t_regs: # t registers removed from past destinations after jal - cannot be used after unless restored
-                past_destinations.discard(register)
+            check_function(labels[jal_label]['address'], jal_label, set(), set(), False, "", set()) # jal new function, so reset all parameters
+            # will also keep going
+            usable_t_regs = set() # none now
+            check_stored('$ra', stored, label, instruction, index, branch_path) # $ra changed - make sure stored
             done_jal = True
-        elif instruction['opcode'] in store_instructions: # store word/half/byte
-            if instruction['operands'][1]['base']['value'] == '$sp': # being stored onto stack
+        elif instruction['opcode'] in store_instructions: # store word/half/byte 
+            if is_sp(instruction['operands'][1]): # being stored onto stack
                 stored.add(instruction['operands'][0]['value'])
             else: # first thing used as source, check this
                 source = instruction['operands']
-                check_sources(source, past_destinations, label, instruction, index, done_jal)
+                check_sources(source, destinations, label, instruction, index, done_jal, branch_path, usable_t_regs)
         elif instruction['opcode'] in dest_instructions: # first operator is destination - make sure not changing s value
-            if instruction['opcode'] == 'lw' and instruction['operands'][1]['base']['value'] == '$sp': # loading from stack
-                if(instruction['operands'][0]['value'] in t_regs):
-                    past_destinations.add(instruction['operands'][0]['value']) # loaded t register (likely after jal), so can use value
-                index += 1
-                continue # not actually changing value (in fact, restoring), so don't worry about anything else
             changed_reg = instruction['operands'][0]['value']
+
+            if not is_load_from_stack(instruction): # not loading from stack
+                check_stored(changed_reg, stored, label, instruction, index, branch_path) # something changed - make sure not unstored callee-saved
+
+                # checking sources before adding as destination - in case reg used as both source and destination, need to make sure not used as source here before destination in prior instruction
+                sources = instruction['operands'][1:] # other operands - definitely sources
+                check_sources(sources, destinations, label, instruction, index, done_jal, branch_path, usable_t_regs) # make sure have been destination first
             
-            if changed_reg in s_regs and changed_reg not in stored: # s register which hasn't been stored
-                violation_message = "Potential violation: " + changed_reg + " changed in " + label + " and not saved.\t"
-                violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n"
-                potential_violations[index] = violation_message
-
-            sources = instruction['operands'][1:] # other operands - definitely sources
-            check_sources(sources, past_destinations, label, instruction, index, done_jal) # check sources first - in case reg used as source and destination, need to make sure not used as source before destination
-
-            past_destinations.add(changed_reg)
+            destinations.add(changed_reg)
+            if changed_reg in t_regs:
+                usable_t_regs.add(changed_reg)
         elif instruction['opcode'] in source_instructions: # source instruction - first reg is source
             sources = instruction['operands']
-            check_sources(sources, past_destinations, label, instruction, index, done_jal)
-        elif not is_fp_instruction(instruction['opcode']) and instruction['opcode'] != 'syscall' and instruction['opcode'] not in branch_instructions:
+            check_sources(sources, destinations, label, instruction, index, done_jal, branch_path, usable_t_regs)
+        elif instruction['opcode'] not in all_instructions:
             print("INSTRUCTION NOT RECOGNIZED", instruction['opcode'], "\n", instruction)
 
-        if instruction['opcode'] in branch_instructions: # branch or jump
+        if instruction['opcode'] in branch_instructions: # branch or jump - take all possible paths
             if index not in taken_branch_indices: # did not do this branch yet, so let's take it
                 branch_label = get_identifier(instruction)
                 taken_branch_indices.add(index)
-                check_function(labels[branch_label]['address'], label, stored, past_destinations, done_jal)
+                check_function(labels[branch_label]['address'], label, stored, destinations, done_jal, branch_path + branch_label + "->", usable_t_regs)
         index += 1
+    
 
-check_function(labels['main']['address'], 'main', set(), set(), False)
-for index in sorted(potential_violations):
-    print(potential_violations[index])
+check_function(labels['main']['address'], 'main', set(), set(), False, "", set()) # start at main, traverse recursively through all possible paths 
+
+print()
+if len(potential_violations) > 0:
+    for index in sorted(potential_violations):
+        print(potential_violations[index])
+else:
+    print("No potential calling convention violations detected. You're good to go!\n")
