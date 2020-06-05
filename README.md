@@ -14,7 +14,7 @@ cd calling-convention-validation
 npm install
 npm run build
 
-./bin/mips-parser --help
+bin/mips-parser --help # validate that parser is working
 ```
 
 
