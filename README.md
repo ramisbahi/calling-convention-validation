@@ -1,10 +1,11 @@
 # calling-convention-validation
 
-This Python script allows you to analyze a MIPS file for potential calling convention violations. There are essentially two categories:
+This Python script allows you to analyze a MIPS file for potential calling convention violations. There are essentially three categories of potential violations:
 * Assuming a value in a register which isn’t $a (determined by not having used this register as a destination previously in this function) - should be passed as arg 
 * Assuming value in a $t register which was not saved/restored before/after jal 
 * Changing an unstored $s register 
 
+There are all checked in the context of each function (something which is called by a jal). Different paths are navigated through branching, as well.
 
 ### Usage 
 
