@@ -7,6 +7,17 @@ This Python script allows you to analyze a MIPS file for potential calling conve
 
 There are all checked in the context of each function (something which is called by a jal). Different paths are navigated through branching, as well.
 
+### Installing parser
+
+```
+cd calling-convention-validation
+npm install
+npm run build
+
+bin/mips-parser --help # validate that parser is working
+```
+
+
 ### Usage 
 
 To analyze analyze.s:
