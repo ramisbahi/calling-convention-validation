@@ -23,4 +23,4 @@ python3 callconv.py [filepath]
 
 ### Resources
 
-The `mips-parser` is implemented using [Syntax](https://github.com/DmitrySoshnikov/syntax) tool, which generates a LALR(1) parser based on the MIPS [grammar](https://github.com/DmitrySoshnikov/mips-parser/blob/master/mips.g).
+The `mips-parser` is implemented using [Syntax](https://github.com/DmitrySoshnikov/syntax) tool, which generates a LALR(1) parser based on the MIPS [grammar](https://github.com/DmitrySoshnikov/mips-parser/blob/master/mips.g). The parser is adapted from Dmitry Soshnikov, with some modifications to support more MIPS instructions.
