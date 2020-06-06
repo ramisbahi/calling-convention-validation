@@ -12,7 +12,7 @@ Before using the Python script (callconv.py), the parser must be installed.
 ### Cloning repository and installing parser
 
 ```
-https://github.com/ramisbahi/calling-convention-validation.git
+git clone https://github.com/ramisbahi/calling-convention-validation.git
 cd calling-convention-validation
 npm install
 npm run build
