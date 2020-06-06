@@ -58,6 +58,8 @@ def write_to_adjusted(content):
             for i, token in enumerate(tokens):
                 if token not in all_instructions and token not in directives and ':' not in token and ',' not in token and i < last_op_index: # add comma here
                     adjusted.write(token + ', ')
+                elif token[:-1] in all_instructions and token[-1] == ',': # is instruction then comma
+                    adjusted.write(token[:-1] + ' ')
                 elif token != ',':
                     adjusted.write(token + ' ')
             if is_instruction(tokens):
@@ -128,7 +130,7 @@ def check_sources(sources, destinations, label, instruction, index, done_jal, br
         else:
             break # not a register or address operand, not going to find one after this
         violation_message = ""
-        violation = False
+        violation = False 
         if value not in destinations:
             if do_not_assume_reg(value, done_jal):
                 violation = True
