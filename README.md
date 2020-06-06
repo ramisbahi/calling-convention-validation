@@ -26,13 +26,13 @@ bin/mips-parser --help # validate that parser is working
 To analyze a MIPS .s file:
 
 ```
-python3 callconv.py filepath
+python callconv.py filepath
 ```
 
 To get a help/usage message:
 
 ```
-python3 callconv.py -h
+python callconv.py -h
 ```
 
 ### Handling Errors
