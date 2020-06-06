@@ -22,13 +22,7 @@ bin/mips-parser --help # validate that parser is working
 
 ### Usage 
 
-To analyze analyze.s:
-
-```
-python3 callconv.py
-```
-
-Or to analyze a file of your choosing:
+To analyze a MIPS .s file:
 
 ```
 python3 callconv.py [filepath]
