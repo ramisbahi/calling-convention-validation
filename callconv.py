@@ -65,10 +65,6 @@ def write_to_adjusted(content):
                 elif token != ',':
                     adjusted.write(token + ' ')
             if is_instruction(tokens) or comma_instruction:  
-                print(index)
-                print(line_number + 1)
-                print(tokens)
-                print()
                 instruction_map[index] = line_number + 1
                 index += 1
             adjusted.write('\n')
@@ -94,13 +90,6 @@ output = stream.read()
 parsed = json.loads(output)
 instructions = parsed['segments']['.text']['instructions']
 labels = parsed['labels']
-
-for index in instruction_map:
-    print(index)
-    print(instruction_map[index])
-    print(instructions[index])
-    print()
-
 
 taken_branch_indices = set() # branches we have taken (index they were called at)
 
