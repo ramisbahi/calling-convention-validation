@@ -7,14 +7,14 @@ import argparse
 dest_instructions = set(['add', 'addi', 'addiu', 'addu', 'divu', 'mulu', 'mulou', 'clo', 'clz', 'la', 'li', 'lui', 'move', 'negu', 'seb', 'seh', 'sub', 'subu', 'rotr', 'rotrv', 'sll', 'sllv', 'sra', 'srav', 'srl', 'srlv', 'and', 'andi', 'ext', 'ins', 'nor', 'not', 'or', 'ori', 'wsbh', 'xor', 'xori', 'movn', 'movz', 'slt', 'slti', 'sltiu', 'sltu', 'sgt', 'seq', 'sge', 'sle', 'sgeu', 'sgtu', 'sleu', 'sne', 'mul', 'mfhi', 'mflo', 'jalr', 'lb', 'lbu', 'lh', 'lhu', 'lw', 'lwl', 'lwr', 'ulw', 'll', 'sc', 'l.s'])
 
 # 0th operand is a source register
-source_instructions = set(['div', 'divu', 'madd', 'maddu', 'msub', 'msubu', 'mult', 'multu', 'mthi', 'mtlo', 'beq', 'beqz', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'jr'])
+source_instructions = set(['div', 'divu', 'madd', 'maddu', 'msub', 'msubu', 'mult', 'multu', 'mthi', 'mtlo', 'beq', 'beqz', 'bge', 'ble', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'jr'])
 
 # storing something 
 store_instructions = set(['sb', 'sh', 'swl', 'sw', 'swr', 'usw', 's.s', 'swc1'])
 load_instructions = set(['lb', 'lh', 'lw'])
 
 # jump or branch
-branch_instructions = set(['beq', 'beqz', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'j', 'b', 'bc1t', 'bc1f'])
+branch_instructions = set(['beq', 'beqz', 'bgez', 'bge', 'ble', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'j', 'b', 'bc1t', 'bc1f'])
 
 other_instructions = set(['jal', 'syscall', 'sw', 'lwc1', 'swc1', 'mfc1', 'mtc1', 'mov.s', 'mov.d', 'li.s', 'li.d', 'c.eq.s', 'c.eq.d', 'c.le.s', 'c.le.d', 'c.lt.s', 'c.lt.d', 'c.gt.s', 'c.gt.d', 'c.ge.s', 'c.ge.d', 'mul.s',  'div.s', 'add.s', 'sub.s', 'sub.d', 's.s', 'l.s', 'l.d', 's.d', 'l.d', 'cvt.s.d', 'cvt.s.w', 'cvt.d.s', 'cvt.d.w', 'cvt.w.d', 'cvt.w.s', 'div.d', 'add.d', 'mul.d', 'abs.d', 'abs.s'])
 
@@ -141,7 +141,8 @@ def check_sources(sources, destinations, label, instruction, index, done_jal, br
             violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n" 
             path = label + "->" + branch_path
             violation_message += "Path taken: " + path[:-2] + "\n"
-            potential_violations[index] = violation_message 
+            if index not in potential_violations or violation_message.count('->') < potential_violations[index].count('->'): # make sure only replace if less branching
+                potential_violations[index] = violation_message 
 
 # register - a register which has been changed (used as a destination), as determined in traversal
 # stored - what we have stored in this context
@@ -195,7 +196,7 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
 
     index = start
     # go through each instruction in callee function, will not hit same instruction more than INSTRUCTION_COUNT_LIMIT times
-    while instructions[index]['opcode'] not in ['jr', 'j', 'b'] and not is_syscall_10(index) and (index not in instruction_count_map or instruction_count_map[index] < INSTRUCTION_COUNT_LIMIT): 
+    while instructions[index]['opcode'] != 'jr' and not is_syscall_10(index) and (index not in instruction_count_map or instruction_count_map[index] < INSTRUCTION_COUNT_LIMIT): 
         instruction = instructions[index]
         if instruction['opcode'] == 'jal':
             jal_label = instruction['operands'][0]['value']
@@ -238,6 +239,8 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
             instruction_count_map[index] = 1
         else:
             instruction_count_map[index] += 1 # increment number of times this instruction has been done
+        if instruction['opcode'] in ['j', 'b']: # jump or branch - stop
+            return # stop now
         index += 1
     
 
