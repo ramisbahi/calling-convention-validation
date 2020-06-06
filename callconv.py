@@ -58,7 +58,7 @@ def write_to_adjusted(content):
             for i, token in enumerate(tokens):
                 if token not in all_instructions and token not in directives and ':' not in token and ',' not in token and i < last_op_index: # add comma here
                     adjusted.write(token + ', ')
-                elif token is not ',':
+                elif token != ',':
                     adjusted.write(token + ' ')
             if is_instruction(tokens):
                 # print(index)
@@ -171,7 +171,14 @@ def is_sp(operand):
 def is_load_from_stack(instruction):
     return instruction['opcode'] in load_instructions and is_sp(instruction['operands'][1])
 
-# later - to differentiate between t reg which needed to be saved before jal and t register not in current context, have destinations and usable_t_regs - usable resets when jal, destinations doesn't - if not in destinations at all - bad, elif not in usable_t_regs - save from last jal
+def is_syscall_10(index):
+    if instructions[index]['opcode'] == 'syscall':
+        for i in [index-2, index-1]: # see if making $v0 = 10
+            if i >= 0 and instructions[i]['opcode'] == 'li' and instructions[i]['operands'][0]['value'] == '$v0' and instructions[i]['operands'][1]['value'] == 10:
+                return True
+    return False
+
+# to differentiate between t reg which needed to be saved before jal and t register not in current context, have destinations and usable_t_regs - usable resets when jal, destinations doesn't - if not in destinations at all - bad, elif not in usable_t_regs - save from last jal
 
 ####### main traversal - checks for potential calling convention violations
 # start = starting index
@@ -188,7 +195,7 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
 
     index = start
     # go through each instruction in callee function, will not hit same instruction more than INSTRUCTION_COUNT_LIMIT times
-    while instructions[index]['opcode'] not in ['jr', 'j', 'b'] and (index not in instruction_count_map or instruction_count_map[index] < INSTRUCTION_COUNT_LIMIT): 
+    while instructions[index]['opcode'] not in ['jr', 'j', 'b'] and not is_syscall_10(index) and (index not in instruction_count_map or instruction_count_map[index] < INSTRUCTION_COUNT_LIMIT): 
         instruction = instructions[index]
         if instruction['opcode'] == 'jal':
             jal_label = instruction['operands'][0]['value']
