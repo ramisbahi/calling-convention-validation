@@ -1,9 +1,10 @@
 import os
 import json
 import sys
+import argparse
 
 # 0th operand is a modified dest register
-dest_instructions = set(['add', 'addi', 'addiu', 'addu', 'clo', 'clz', 'la', 'li', 'lui', 'move', 'negu', 'seb', 'seh', 'sub', 'subu', 'rotr', 'rotrv', 'sll', 'sllv', 'sra', 'srav', 'srl', 'srlv', 'and', 'andi', 'ext', 'ins', 'nor', 'not', 'or', 'ori', 'wsbh', 'xor', 'xori', 'movn', 'movz', 'slt', 'slti', 'sltiu', 'sltu', 'sgt', 'seq', 'sge', 'sle', 'sgeu', 'sgtu', 'sleu', 'sne', 'mul', 'mfhi', 'mflo', 'jalr', 'lb', 'lbu', 'lh', 'lhu', 'lw', 'lwl', 'lwr', 'ulw', 'll', 'sc', 'l.s'])
+dest_instructions = set(['add', 'addi', 'addiu', 'addu', 'divu', 'mulu', 'mulou', 'clo', 'clz', 'la', 'li', 'lui', 'move', 'negu', 'seb', 'seh', 'sub', 'subu', 'rotr', 'rotrv', 'sll', 'sllv', 'sra', 'srav', 'srl', 'srlv', 'and', 'andi', 'ext', 'ins', 'nor', 'not', 'or', 'ori', 'wsbh', 'xor', 'xori', 'movn', 'movz', 'slt', 'slti', 'sltiu', 'sltu', 'sgt', 'seq', 'sge', 'sle', 'sgeu', 'sgtu', 'sleu', 'sne', 'mul', 'mfhi', 'mflo', 'jalr', 'lb', 'lbu', 'lh', 'lhu', 'lw', 'lwl', 'lwr', 'ulw', 'll', 'sc', 'l.s'])
 
 # 0th operand is a source register
 source_instructions = set(['div', 'divu', 'madd', 'maddu', 'msub', 'msubu', 'mult', 'multu', 'mthi', 'mtlo', 'beq', 'beqz', 'bgez', 'blt', 'bgt', 'bgezal', 'bgtz', 'blez', 'bltz', 'bltzal', 'bne', 'bnez', 'jr'])
@@ -22,9 +23,11 @@ all_instructions = dest_instructions.union(source_instructions).union(store_inst
 t_regs = set(['$t0', '$t1', '$t2', '$t3', '$t4', '$t5', '$t6', '$t7', '$t8', '$t9'])
 callee_regs = set(['$s0', '$s1', '$s2', '$s3', '$s4', '$s5', '$s6', '$s7', '$s8', '$s9', '$ra'])
 
-directives = set(['.data', '.word', '.globl', '.half', '.byte', '.align', '.word', '.float', '.space', '.ascii', '.asciiz', '.text'])
+directives = set(['.data', '.word', '.globl', '.half', '.byte', '.align', '.word', '.float', '.space', '.ascii', '.asciiz', '.text', '.extern'])
 
-instruction_map = {} # maps index to line number
+instruction_map = {} # maps instruction index to line number
+instruction_count_map = {} # maps instruction index to number of times has been done
+INSTRUCTION_COUNT_LIMIT = 10 # arbitrary number - to not hit an instruction more than x times (i.e. recursion, branching all over)
 
 def calc_last_op_index(tokens):
     ret = 0
@@ -48,14 +51,14 @@ def write_to_adjusted(content):
     index = 0
     with open('adjusted.s', 'w') as adjusted:
         for line_number, line in enumerate(content):
-            if '.align' in line:
+            if '.align' in line or '.end' in line:
                 continue # don't write this line
             tokens = line.split()
             last_op_index = calc_last_op_index(tokens)
             for i, token in enumerate(tokens):
                 if token not in all_instructions and token not in directives and ':' not in token and ',' not in token and i < last_op_index: # add comma here
                     adjusted.write(token + ', ')
-                else:
+                elif token is not ',':
                     adjusted.write(token + ' ')
             if is_instruction(tokens):
                 # print(index)
@@ -66,9 +69,15 @@ def write_to_adjusted(content):
                 index += 1
             adjusted.write('\n')
 
-source_file = 'analyze.s'
-if len(sys.argv) > 1:
-    source_file = sys.argv[1]
+parser = argparse.ArgumentParser(description='\nAnalyze MIPS file for potential calling convention violations.\n')
+parser.add_argument('file', metavar='file_path', type=str, nargs=1, help='Path to MIPS .s file to be analyzed')
+try:
+    args = parser.parse_args()
+except:
+    print(parser.print_help())
+    sys.exit(0)
+
+source_file = sys.argv[1]
 
 with open(source_file, 'r') as source:
     content = source.readlines()
@@ -123,10 +132,10 @@ def check_sources(sources, destinations, label, instruction, index, done_jal, br
         if value not in destinations:
             if do_not_assume_reg(value, done_jal):
                 violation = True
-                violation_message = "Potential violation: value of " + value + " is assumed in " + label +". This register has not been used as a destination in this context. It should be passed as an argument.\n"
+                violation_message = "Potential violation: Value of " + value + " is assumed in " + label +" function. This register has not been used as a destination in this context. It should be passed as an argument.\n"
         elif value in t_regs and value not in usable_t_regs: # t register in destinations, but not usable_t_regs
             violation = True
-            violation_message = "Potential violation: value of " + value + " is assumed in " + label +". This should have been saved/restored before/after a recent jal in this context.\n"
+            violation_message = "Potential violation: Value of " + value + " is assumed in " + label +" function. This should have been saved/restored before/after a recent jal in this context.\n"
         
         if violation:
             violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n" 
@@ -143,7 +152,7 @@ def check_sources(sources, destinations, label, instruction, index, done_jal, br
 # if unstored callee-saved, this is a potential violation (since we know it has been changed)
 def check_stored(register, stored, label, instruction, index, branch_path):
     if register in callee_regs and register not in stored: # s/$ra register which hasn't been stored (being changed = uh oh)
-        violation_message = "Potential violation: " + register + " changed in " + label + " and not saved.\n"
+        violation_message = "Potential violation: " + register + " changed in " + label + " function and not saved.\n"
         violation_message += string_instruction(instruction) + " on line " + str(instruction_map[index]) + "\n"
         path = label + "->" + branch_path
         violation_message += "Path taken: " + path[:-2] + "\n"
@@ -178,7 +187,8 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
     usable_t_regs = past_usable_t_regs.copy()
 
     index = start
-    while instructions[index]['opcode'] not in ['jr', 'j', 'b']: # go through each instruction in callee function
+    # go through each instruction in callee function, will not hit same instruction more than INSTRUCTION_COUNT_LIMIT times
+    while instructions[index]['opcode'] not in ['jr', 'j', 'b'] and (index not in instruction_count_map or instruction_count_map[index] < INSTRUCTION_COUNT_LIMIT): 
         instruction = instructions[index]
         if instruction['opcode'] == 'jal':
             jal_label = instruction['operands'][0]['value']
@@ -217,14 +227,20 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
                 branch_label = get_identifier(instruction)
                 taken_branch_indices.add(index)
                 check_function(labels[branch_label]['address'], label, stored, destinations, done_jal, branch_path + branch_label + "->", usable_t_regs)
+        if index not in instruction_count_map: 
+            instruction_count_map[index] = 1
+        else:
+            instruction_count_map[index] += 1 # increment number of times this instruction has been done
         index += 1
     
 
 check_function(labels['main']['address'], 'main', set(), set(), False, "", set()) # start at main, traverse recursively through all possible paths 
 
-print()
+print('')
+count = 1
 if len(potential_violations) > 0:
     for index in sorted(potential_violations):
-        print(potential_violations[index])
+        print('{}{} {}'.format(count, ')', potential_violations[index]))
+        count += 1
 else:
     print("No potential calling convention violations detected. You're good to go!\n")
