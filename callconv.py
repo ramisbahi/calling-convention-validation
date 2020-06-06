@@ -54,22 +54,25 @@ def write_to_adjusted(content):
             if '.align' in line or '.end' in line:
                 continue # don't write this line
             tokens = line.split()
+            comma_instruction = False
             last_op_index = calc_last_op_index(tokens)
             for i, token in enumerate(tokens):
                 if token not in all_instructions and token not in directives and ':' not in token and ',' not in token and i < last_op_index: # add comma here
                     adjusted.write(token + ', ')
                 elif token[:-1] in all_instructions and token[-1] == ',': # is instruction then comma
                     adjusted.write(token[:-1] + ' ')
+                    comma_instruction = True
                 elif token != ',':
                     adjusted.write(token + ' ')
-            if is_instruction(tokens):
-                # print(index)
-                # print(line_number + 1)
-                # print(tokens)
-                # print()
+            if is_instruction(tokens) or comma_instruction:  
+                print(index)
+                print(line_number + 1)
+                print(tokens)
+                print()
                 instruction_map[index] = line_number + 1
                 index += 1
             adjusted.write('\n')
+
 
 parser = argparse.ArgumentParser(description='\nAnalyze MIPS file for potential calling convention violations.\n')
 parser.add_argument('file', metavar='file_path', type=str, nargs=1, help='Path to MIPS .s file to be analyzed')
@@ -91,6 +94,13 @@ output = stream.read()
 parsed = json.loads(output)
 instructions = parsed['segments']['.text']['instructions']
 labels = parsed['labels']
+
+for index in instruction_map:
+    print(index)
+    print(instruction_map[index])
+    print(instructions[index])
+    print()
+
 
 taken_branch_indices = set() # branches we have taken (index they were called at)
 
