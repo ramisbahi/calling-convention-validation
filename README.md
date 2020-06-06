@@ -7,11 +7,12 @@ This Python script allows you to analyze a MIPS file for potential calling conve
 
 There are all checked in the context of each function (something which is called by a jal). Different paths are navigated through branching, as well.
 
-Before using the Python script (callconv.py), the parser must be installed. First, clone this repository. Then, do the following:
+Before using the Python script (callconv.py), the parser must be installed.
 
-### Installing parser
+### Cloning repository and installing parser
 
 ```
+https://github.com/ramisbahi/calling-convention-validation.git
 cd calling-convention-validation
 npm install
 npm run build
