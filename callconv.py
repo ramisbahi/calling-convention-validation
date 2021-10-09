@@ -27,7 +27,7 @@ directives = set(['.data', '.word', '.globl', '.half', '.byte', '.align', '.word
 
 instruction_map = {} # maps instruction index to line number
 instruction_count_map = {} # maps instruction index to number of times has been done
-INSTRUCTION_COUNT_LIMIT = 10 # arbitrary number - to not hit an instruction more than x times (i.e. recursion, branching all over)
+INSTRUCTION_COUNT_LIMIT = 15 # arbitrary number - to not hit an instruction more than x times (i.e. recursion, branching all over)
 
 def calc_last_op_index(tokens):
     ret = 0
@@ -99,7 +99,7 @@ def get_identifier(instruction):
     for operand in instruction['operands']:
         if operand['type'] == 'Identifier':
             return operand['value']
-    return ''
+    return None
 
 def is_fp_instruction(instruction):
     return "." in instruction or "c1" in instruction
@@ -234,8 +234,9 @@ def check_function(start, label, past_stored, past_destinations, done_jal, branc
         if instruction['opcode'] in branch_instructions: # branch or jump - take all possible paths
             if index not in taken_branch_indices: # did not do this branch yet, so let's take it
                 branch_label = get_identifier(instruction)
-                taken_branch_indices.add(index)
-                check_function(labels[branch_label]['address'], label, stored, destinations, done_jal, branch_path + branch_label + "->", usable_t_regs)
+                if branch_label: # some weird cases where it's j $ra... 
+                    taken_branch_indices.add(index)
+                    check_function(labels[branch_label]['address'], label, stored, destinations, done_jal, branch_path + branch_label + "->", usable_t_regs)
         if index not in instruction_count_map: 
             instruction_count_map[index] = 1
         else:
